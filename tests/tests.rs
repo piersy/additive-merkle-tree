@@ -1,23 +1,17 @@
 #[cfg(test)]
-// mod tests {
 use additive_merkle_tree::{Hasher, Tree};
 use sha2::{Digest, Sha256};
-// #[test]
-// fn tree_generates_correct_root() {
-//     assert_eq!(2 + 2, 4);
-// }
 
-struct TestHasher {}
-impl Hasher for TestHasher {
-    fn hash2(&self, a: &[u8], b: &[u8]) -> Vec<u8> {
-        Sha256::new()
-            .chain_update(a)
-            .chain_update(b)
-            .finalize()
-            .to_vec()
+struct TestHasher {
+    h: Sha256,
+}
+
+impl<'a> Hasher for TestHasher {
+    fn add(&mut self, a: &[u8]) {
+        self.h.update(a);
     }
-    fn hash1(&self, a: &[u8]) -> Vec<u8> {
-        Sha256::new().chain_update(a).finalize().to_vec()
+    fn finalize(&mut self) -> Vec<u8> {
+        self.h.finalize_reset().to_vec()
     }
 }
 
@@ -25,22 +19,32 @@ impl Hasher for TestHasher {
 fn testhash() {
     let mut t = Tree {
         peaks: Vec::new(),
-        hasher: &TestHasher {},
+        hasher: Box::new(TestHasher { h: Sha256::new() }),
     };
     t.add(b"a");
     t.add(b"b");
     t.add(b"c");
     t.add(b"d");
 
-    let h = &TestHasher {};
-    let a = h.hash1(b"a");
-    let b = h.hash1(b"b");
-    let c = h.hash1(b"c");
-    let d = h.hash1(b"d");
+    let h = &mut TestHasher { h: Sha256::new() };
+    h.add(b"a");
+    let a = h.finalize();
+    h.add(b"b");
+    let b = h.finalize();
+    h.add(b"c");
+    let c = h.finalize();
+    h.add(b"d");
+    let d = h.finalize();
 
-    let ab = h.hash2(&a, &b);
-    let cd = h.hash2(&c, &d);
-    let abcd = h.hash2(&ab, &cd);
+    h.add(&a);
+    h.add(&b);
+    let ab = h.finalize();
+    h.add(&c);
+    h.add(&d);
+    let cd = h.finalize();
+    h.add(&ab);
+    h.add(&cd);
+    let abcd = h.finalize();
 
     assert_eq!(t.root(), abcd)
 }

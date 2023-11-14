@@ -1,26 +1,29 @@
 /// Tree contains the peaks of the tree currently under construction.
-pub struct Tree<'a> {
+pub struct Tree {
     pub peaks: Vec<Vec<u8>>,
-    pub hasher: &'a dyn Hasher,
+    pub hasher: Box<dyn Hasher>,
 }
 
 pub trait Hasher {
-    fn hash2(&self, a: &[u8], b: &[u8]) -> Vec<u8>;
-    fn hash1(&self, a: &[u8]) -> Vec<u8>;
+    fn add(&mut self, a: &[u8]);
+    fn finalize(&mut self) -> Vec<u8>;
 }
 
 const EMPTY_LEAF: &[u8; 9] = b"emptyLeaf";
 
-impl<'a> Tree<'a> {
+impl Tree {
     pub fn add(&mut self, leaf: &[u8]) {
-        let mut node = self.hasher.hash1(leaf);
+        self.hasher.add(leaf);
+        let mut node = self.hasher.finalize();
         // Hash upwards
         for ele in self.peaks.iter_mut() {
             if ele.len() == 0 {
                 *ele = node;
                 return;
             } else {
-                node = self.hasher.hash2(ele, &node);
+                self.hasher.add(ele);
+                self.hasher.add(&node);
+                node = self.hasher.finalize();
                 *ele = vec![];
             }
         }
@@ -28,9 +31,10 @@ impl<'a> Tree<'a> {
         self.peaks.push(node);
     }
 
-    pub fn root(&self) -> Vec<u8> {
+    pub fn root(&mut self) -> Vec<u8> {
         let mut node: Vec<u8> = Vec::new();
-        let empty_leaf_hash = self.hasher.hash1(EMPTY_LEAF);
+        self.hasher.add(EMPTY_LEAF);
+        let empty_leaf_hash = self.hasher.finalize();
         for i in 0..self.peaks.len() {
             let ele = &self.peaks[i];
             // If we have no node and there is no peak then go to next peak
@@ -42,17 +46,23 @@ impl<'a> Tree<'a> {
                 if ele.len() == 0 {
                     continue;
                 } else {
-                    node = self.hasher.hash2(&ele, &empty_leaf_hash);
+                    self.hasher.add(&ele);
+                    self.hasher.add(&empty_leaf_hash);
+                    node = self.hasher.finalize();
                     continue;
                 }
             }
 
             // If we've set node and we have an empty peak, mix node with the empty node
             if ele.len() == 0 {
-                node = self.hasher.hash2(&node, &empty_leaf_hash);
+                self.hasher.add(&node);
+                self.hasher.add(&empty_leaf_hash);
+                node = self.hasher.finalize();
             // If we've set node and we have a non empty peak, mix the peak with the node
             } else {
-                node = self.hasher.hash2(ele, &node);
+                self.hasher.add(ele);
+                self.hasher.add(&node);
+                node = self.hasher.finalize();
             }
         }
         node
