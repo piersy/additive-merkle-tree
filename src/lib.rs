@@ -5,15 +5,28 @@ pub struct Tree {
 }
 
 pub trait Hasher {
-    fn add(&mut self, a: &[u8]);
+    // update adds the provided bytes to the current hash instance.
+    fn update(&mut self, a: &[u8]);
+    // finalize computes the hash, returns it and resets the state ready to compute a new hash.
     fn finalize(&mut self) -> Vec<u8>;
+    // hash1 is a convenience function that returns the hash of the given byte slice.
+    fn hash1(&mut self, a: &[u8]) -> Vec<u8> {
+        self.update(a);
+        self.finalize()
+    }
+    // hash2 is a convenience function that returns the hash of the two given byte slices.
+    fn hash2(&mut self, a: &[u8], b: &[u8]) -> Vec<u8> {
+        self.update(a);
+        self.update(b);
+        self.finalize()
+    }
 }
 
 const EMPTY_LEAF: &[u8; 9] = b"emptyLeaf";
 
 impl Tree {
     pub fn add(&mut self, leaf: &[u8]) {
-        self.hasher.add(leaf);
+        self.hasher.update(leaf);
         let mut node = self.hasher.finalize();
         // Hash upwards
         for ele in self.peaks.iter_mut() {
@@ -21,8 +34,8 @@ impl Tree {
                 *ele = node;
                 return;
             } else {
-                self.hasher.add(ele);
-                self.hasher.add(&node);
+                self.hasher.update(ele);
+                self.hasher.update(&node);
                 node = self.hasher.finalize();
                 *ele = vec![];
             }
@@ -33,7 +46,7 @@ impl Tree {
 
     pub fn root(&mut self) -> Vec<u8> {
         let mut node: Vec<u8> = Vec::new();
-        self.hasher.add(EMPTY_LEAF);
+        self.hasher.update(EMPTY_LEAF);
         let empty_leaf_hash = self.hasher.finalize();
         for i in 0..self.peaks.len() {
             let ele = &self.peaks[i];
@@ -46,8 +59,8 @@ impl Tree {
                 if ele.len() == 0 {
                     continue;
                 } else {
-                    self.hasher.add(&ele);
-                    self.hasher.add(&empty_leaf_hash);
+                    self.hasher.update(&ele);
+                    self.hasher.update(&empty_leaf_hash);
                     node = self.hasher.finalize();
                     continue;
                 }
@@ -55,13 +68,13 @@ impl Tree {
 
             // If we've set node and we have an empty peak, mix node with the empty node
             if ele.len() == 0 {
-                self.hasher.add(&node);
-                self.hasher.add(&empty_leaf_hash);
+                self.hasher.update(&node);
+                self.hasher.update(&empty_leaf_hash);
                 node = self.hasher.finalize();
             // If we've set node and we have a non empty peak, mix the peak with the node
             } else {
-                self.hasher.add(ele);
-                self.hasher.add(&node);
+                self.hasher.update(ele);
+                self.hasher.update(&node);
                 node = self.hasher.finalize();
             }
         }

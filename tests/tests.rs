@@ -7,7 +7,7 @@ struct TestHasher {
 }
 
 impl<'a> Hasher for TestHasher {
-    fn add(&mut self, a: &[u8]) {
+    fn update(&mut self, a: &[u8]) {
         self.h.update(a);
     }
     fn finalize(&mut self) -> Vec<u8> {
@@ -27,24 +27,14 @@ fn testhash() {
     t.add(b"d");
 
     let h = &mut TestHasher { h: Sha256::new() };
-    h.add(b"a");
-    let a = h.finalize();
-    h.add(b"b");
-    let b = h.finalize();
-    h.add(b"c");
-    let c = h.finalize();
-    h.add(b"d");
-    let d = h.finalize();
+    let a = h.hash1(b"a");
+    let b = h.hash1(b"b");
+    let c = h.hash1(b"c");
+    let d = h.hash1(b"d");
 
-    h.add(&a);
-    h.add(&b);
-    let ab = h.finalize();
-    h.add(&c);
-    h.add(&d);
-    let cd = h.finalize();
-    h.add(&ab);
-    h.add(&cd);
-    let abcd = h.finalize();
+    let ab = h.hash2(&a, &b);
+    let cd = h.hash2(&c, &d);
+    let abcd = h.hash2(&ab, &cd);
 
     assert_eq!(t.root(), abcd)
 }
